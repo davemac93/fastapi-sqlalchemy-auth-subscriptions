@@ -1,8 +1,11 @@
-from datetime import timedelta, datetime, timezone
-from passlib.context import CryptContext
-from app.models import User
-from app.core import settings
+from datetime import datetime, timedelta, timezone
+
 from jose import jwt
+from passlib.context import CryptContext
+from sqlalchemy import or_
+
+from app.core import settings
+from app.models import User
 
 class PasswordManager:
     bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -15,8 +18,13 @@ class PasswordManager:
         return cls.bcrypt_context.verify(password, hashedpassword)
 
     @classmethod
-    def authenticate_user(cls, email: str, password: str, db):
-        user = db.query(User).filter(email == User.email).first()
+    def authenticate_user(cls, username_or_email: str, password: str, db):
+        # Allow login with either email or username (OAuth2PasswordRequestForm uses the field name "username")
+        user = (
+            db.query(User)
+            .filter(or_(User.email == username_or_email, User.username == username_or_email))
+            .first()
+        )
         if not user:
             return None
         if not cls.verified_password(password, user.hashed_password):
@@ -36,13 +44,11 @@ class TokenManager:
         }
 
         try:
-            # 3. Sign and return the token
             return jwt.encode(
                 payload, 
                 settings.SECRET_KEY, 
                 algorithm=settings.ALGORITHM
             )
         except Exception as e:
-            # Senior Tip: Log the exact error to your terminal for debugging
             print(f"CRITICAL: JWT Encoding failed: {e}")
             raise e

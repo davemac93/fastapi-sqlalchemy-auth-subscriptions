@@ -10,11 +10,13 @@ from app.core.security import PasswordManager, TokenManager
 from app.core.config import settings
 from app.models import User, Subscription
 from app.schemas import CreateUser
+from app.api.dependecies import get_current_user
 
 
 router = APIRouter(prefix="/api/auth", tags=["users"])
 
 db_dependency = Annotated[Session, Depends(get_db)]
+user_dependency = Annotated[User, Depends(get_current_user)]
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def create_user(user: CreateUser, db: db_dependency):
@@ -79,6 +81,14 @@ async def login_user(user_data: Annotated[OAuth2PasswordRequestForm, Depends()],
             detail="Error generating the access token"
         )
 
+@router.get("/me", status_code=status.HTTP_200_OK)
+async def get_user_details(current_user: user_dependency):
+
+    return {
+        "username": current_user.username,
+        "email": current_user.email,
+        "id": current_user.id
+    }
 
 @router.get("/users")
 async def get_all_users(db: db_dependency):
